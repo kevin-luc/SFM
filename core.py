@@ -90,7 +90,7 @@ class SFMCore():
 
     """
     def __init__(self, view_list, co_rank, view_rank, isFullOrder, input_type, output_range,
-                    loss_function, optimizer, reg_type, reg, init_scaling):
+                    loss_function, optimizer, reg_type, reg, init_std, init_scaling):
         self.view_list = view_list
         self.co_rank = co_rank
         self.view_rank = view_rank
@@ -100,6 +100,7 @@ class SFMCore():
         self.optimizer = optimizer
         self.reg_type = reg_type
         self.reg = reg
+        self.init_std = init_std
         self.init_scaling = init_scaling
         self.n_modes = max([x for v in view_list for x in v ])
         self.n_views = len(view_list)
@@ -130,13 +131,13 @@ class SFMCore():
         # initialize factors for each view
         # to avoid the multiplication close to zero when the views has more than 3 modes
         # we can try to scaling the unfiorm distribution using variance_scaling_initializer
-#        if self.n_views > 1:
-            #self.Phi = tf.get_variable('embedding_phi', shape = [r, self.n_views+1], trainable=True,
-                                    #initializer = tf.contrib.layers.variance_scaling_initializer(factor= self.init_scaling))
-        #else:
+
         self.Phi = tf.get_variable('embedding_phi', shape = [r, self.n_views], trainable=True,
-                                    initializer = tf.contrib.layers.variance_scaling_initializer(factor= self.init_scaling))
-#                                    initializer = tf.contrib.layers.xavier_initializer())
+                                    initializer = tf.contrib.layers.variance_scaling_initializer(factor = self.init_scaling))
+#                                    initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
+
+#        self.Phi = tf.Variable(tf.random_uniform([r, self.n_views], -self.init_std, self.init_std),
+                                #trainable = True, name = 'embedding_phi')
 
         #Phi = tf.nn.l2_normalize(Phi, dim=0)
 #        self.Phi = tf.Variable(Phi, name= 'embedding_phi')
@@ -150,9 +151,12 @@ class SFMCore():
                            trainable=True,
                            initializer = tf.contrib.layers.variance_scaling_initializer(factor = self.init_scaling))
 #                            initializer = tf.contrib.layers.xavier_initializer())
-                #W = tf.nn.l2_normalize(W, dim=0)
+#                           initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
+
+#                self.W[0][m] = tf.Variable(tf.random_uniform([self.n_feature_list[m], self.co_rank], -self.init_std, self.init_std),
+                           #trainable=True,
+                           #name = 'embedding_init')
                 self.S[m] = tf.get_variable('layer_norm_S', initializer = tf.ones([r]))
-                #self.W[0][m] = tf.Variable(W, name = 'embedding')
 
         # initialize view specific facotrs for each mode
         for i, modes in enumerate(self.view_list):
@@ -160,20 +164,19 @@ class SFMCore():
             for m in set(modes):
                 with tf.variable_scope('view_'+str(v)+'_mode_' + str(m)):
                     try:
-                        self.Bias[v][m-1] = tf.get_variable('bias',
+                        self.Bias[v][m-1] = tf.get_variable('bias', shape = [1,r],
                                 trainable = self.isFullOrder,
-                                initializer=tf.zeros_initializer([1, r]))
+                                initializer=tf.zeros_initializer())
                     except:
                         print('bias mode {} shared in view {}'.format(m,v))
                     try:
                         if self.view_rank>0:
                             self.W[v][m-1] = tf.get_variable('embedding_init',
-                               shape = [self.n_feature_list[m-1], self.view_rank],
-                               trainable=True,
+                                shape = [self.n_feature_list[m-1], self.view_rank],
+                                trainable=True,
                                 initializer = tf.contrib.layers.variance_scaling_initializer(factor = init_scaling))
 #                               initializer = tf.contrib.layers.xavier_initializer())
-                            #W = tf.nn.l2_normalize(W, dim=0)
-                            #self.W[v+1][m-1] = tf.Variable(W, name = 'embedding')
+#                           initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
                     except:
                         print('mode {} shared in view {}'.format(m,v))
 
@@ -246,13 +249,13 @@ class SFMCore():
 
     def _init_regular(self):
         self.regularization = 0
-        tf.scalar_summary('bias', self.b)
+        tf.summary.scalar('bias', self.b)
 
         self.regularization = 0
         for m in range(self.n_modes):
             node_name = 'regularization_penalty_v0_m{}'.format(m)
             norm = self._regularizer_func(self.W[0][m],node_name)
-            tf.scalar_summary('norm_W_v0_m{}'.format(m), norm)
+            tf.summary.scalar('norm_W_v0_m{}'.format(m), norm)
             self.regularization += norm
         for i, modes in enumerate(self.view_list):
             v = i + 1
@@ -260,7 +263,7 @@ class SFMCore():
                 try:
                     node_name = 'regularization_penalty_v{}_b{}'.format(v, m)
                     norm = self._regularizer_func(self.Bias[v][m-1], node_name)
-                    tf.scalar_summary('norm_Bias_v{}_m{}'.format(v,m), norm)
+                    tf.summary.scalar('norm_Bias_v{}_m{}'.format(v,m), norm)
                 except:
                     print('bias mode {} shared in view {}'.format(m,v))
                 self.regularization += norm
@@ -268,25 +271,25 @@ class SFMCore():
                     try:
                         node_name = 'regularization_penalty_v{}_m{}'.format(v,m)
                         norm = self._regularizer_func(self.W[v][m-1],node_name)
-                        tf.scalar_summary('norm_W_v{}_m{}'.format(v,m), norm)
+                        tf.summary.scalar('norm_W_v{}_m{}'.format(v,m), norm)
                     except:
                         print('mode {} shared in view {}'.format(m,v))
                     self.regularization += norm
 
         for v in range(len(self.view_list)):
             norm = self._regularizer_func(self.Phi[:,v], 'regularization_penalty_phi{}'.format(v+1))
-            tf.scalar_summary('norm_Phi_v{}'.format(v+1), norm)
+            tf.summary.scalar('norm_Phi_v{}'.format(v+1), norm)
         node_name = 'regularization_penalty_phi'
         norm = self._regularizer_func(self.Phi, node_name)
         self.regularization += norm
-        tf.scalar_summary('regularization_penalty', self.regularization)
+        tf.summary.scalar('regularization_penalty', self.regularization)
 
 #    def _norm_constraint_op(self):
         #scaling = 0
         #for v in range(len(self.view_list)):
             #norm = tf.nn.l2_loss()
             #norm = self._regularizer_func(self.Phi[:,v], 'regularization_penalty_phi{}'.format(v+1))
-            #tf.scalar_summary('norm_Phi_v{}'.format(v+1), norm)
+            #tf.summary.scalar('norm_Phi_v{}'.format(v+1), norm)
         #return tf.assign(self.Phi, scaling)
 #   def _norm_constraint_op(self):
         #assign_op = []
@@ -296,7 +299,7 @@ class SFMCore():
             ## normalize every column in the weight matrix to norm_l2 = 1
             #scaling_mode[m] = tf.sqrt(tf.reduce_sum(tf.square(self.W[0][m]), 0), name = 'scaling_v0_m{}'.format(m)) + eps
             #norm = tf.reduce_sum(scaling_mode[m])
-            #tf.scalar_summary('norm_W_v0_m{}'.format(m), norm)
+            #tf.summary.scalar('norm_W_v0_m{}'.format(m), norm)
 
             #scaled = self.W[0][m] / tf.expand_dims(scaling_mode[m], 0)
             #assign_op.append(tf.assign(self.W[0][m], scaled))
@@ -327,7 +330,7 @@ class SFMCore():
 ##        for i, modes in enumerate(self.view_list):
             ##v = i + 1
             ##norm = tf.nn.l2_loss(self.Phi[:,i])
-            ##tf.scalar_summary('norm_Phi_v{}'.format(v), norm)
+            ##tf.summary.scalar('norm_Phi_v{}'.format(v), norm)
         ##print(assign_op)
         #return assign_op
 
@@ -335,7 +338,7 @@ class SFMCore():
     def _init_loss(self):
         self.loss = self.loss_function(self.outputs, self.train_y)
         self.reduced_loss = tf.reduce_mean(self.loss)
-        tf.scalar_summary('loss', self.reduced_loss)
+        tf.summary.scalar('loss', self.reduced_loss)
 
     def _init_main_block(self):
         self.prod_view = {}
@@ -361,7 +364,7 @@ class SFMCore():
                     with tf.name_scope('mode_{}'.format(m)) as scope:
                         if self.view_rank > 0:
                             XW = self._view_mode_embedding(v, m - 1)
-                            XW_list[m-1] = tf.concat(1, [self.XW_cache[m-1], XW], name='XW')
+                            XW_list[m-1] = tf.concat(axis=1, values=[self.XW_cache[m-1], XW], name='XW')
                         else:
                             XW_list[m-1] = self.XW_cache[m-1]
                         XW_list[m-1] += self.Bias[v][m-1]
@@ -370,23 +373,23 @@ class SFMCore():
 
                 # the reduction_indices in the reduce_prod does not handle scalar, 
                 # so we need to transform it to a tensor
-                embedding_tensor = tf.pack([xw for xw in XW_list if xw is not None],axis=2, name='embedding_tensor')
-                self.prod_embedding[i] = tf.reduce_prod(embedding_tensor, reduction_indices=[2], name='prod_embedding')
+                embedding_tensor = tf.stack([xw for xw in XW_list if xw is not None],axis=2, name='embedding_tensor')
+                self.prod_embedding[i] = tf.reduce_prod(embedding_tensor, axis=[2], name='prod_embedding')
 #                view_prod_sum = tf.reduce_sum(self.prod_embedding[i], reduction_indices=[1], name='view_prod_sum')
-#                tf.histogram_summary('view_prod_sum{}'.format(v), view_prod_sum)
+#                tf.summary.histogram('view_prod_sum{}'.format(v), view_prod_sum)
 
 #                if self.n_views > 1: 
                     #view_contrib = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,0],(r,1)), 'dense')
                     #self.view_contribution[i] = view_contrib + matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,v],(r,1)), 'dense')
-                    #tf.histogram_summary('view_contribution{}'.format(v), self.view_contribution[i])
+                    #tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
                 #else:
                     #self.view_contribution[i] = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,i],(r,1)), 'dense')
-                #tf.histogram_summary('view_contribution{}'.format(v), self.view_contribution[i])
+                #tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
                 self.view_contribution[i] = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,i],(r,1)), 'dense')
-                tf.histogram_summary('view_contribution{}'.format(v), self.view_contribution[i])
+                tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
 
-        self.outputs += tf.reduce_sum(self.view_contribution, reduction_indices=[0], name='output')
-        tf.histogram_summary('output', self.outputs)
+        self.outputs += tf.reduce_sum(self.view_contribution, axis=[0], name='output')
+        tf.summary.histogram('output', self.outputs)
 
         with tf.name_scope('loss') as scope:
             self._init_loss()
@@ -412,7 +415,7 @@ class SFMCore():
         self.checked_target = tf.verify_tensor_all_finite(
             self.target,
             msg='NaN or Inf in target value', name='target')
-        tf.scalar_summary('target', self.checked_target)
+        tf.summary.scalar('target', self.checked_target)
 
     def build_graph(self):
         """Build computational graph according to params."""
@@ -431,9 +434,9 @@ class SFMCore():
             self._init_target()
 
             self.trainer = self.optimizer.minimize(self.checked_target)
-            self.init_all_vars = tf.initialize_all_variables()
+            self.init_all_vars = tf.global_variables_initializer()
 #            self.post_step = self._norm_constraint_op()
-            self.summary_op = tf.merge_all_summaries()
+            self.summary_op = tf.summary.merge_all()
             self.saver = tf.train.Saver()
 
 def matmul_wrapper(A, B, optype):

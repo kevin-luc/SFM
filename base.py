@@ -7,7 +7,6 @@ from sklearn.base import BaseEstimator
 from abc import ABCMeta, abstractmethod
 import six
 from tqdm import tqdm
-from copy import deepcopy
 import numpy as np
 import os
 
@@ -238,7 +237,7 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     """
 
     def init_basemodel(self, co_rank=10, view_rank=0, isFullOrder=True, view_list=None, input_type='dense', output_range = None,
-                        n_epochs=100, loss_function=None, batch_size=-1, reg_type='L2', reg=0.01, init_scaling=2.0,
+                        n_epochs=100, loss_function=None, batch_size=-1, reg_type='L2', reg=0.01, init_std=0.01, init_scaling=2.0,
                         optimizer=tf.train.AdamOptimizer(learning_rate=0.01),
                         log_dir=None, session_config=None, verbose=0):
         assert view_list is not None
@@ -253,6 +252,7 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
             'optimizer': optimizer,
             'reg_type': reg_type,
             'reg': reg,
+            'init_std': init_std,
             'init_scaling': init_scaling
         }
         self.output_range = output_range
@@ -280,7 +280,7 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
         if self.core.graph is None:
             raise 'Graph not found. Try call .core.build_graph() before ._initialize_session()'
         if self.need_logs:
-            self.summary_writer = tf.train.SummaryWriter(
+            self.summary_writer = tf.summary.FileWriter(
                 self.log_dir,
                 self.core.graph)
             if self.verbose > 0:
