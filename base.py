@@ -126,8 +126,8 @@ def batch_to_feeddict(X, y, core, mode_matrices = None):
     return fd
 
 class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
-    """Base class for Structure-awared FM.
-    
+    """Base class for Structural Factorization Machines.
+
     It can handle both dense and sparse input. Only numpy.array and CSR matrix are
     allowed as inputs; any other input format should be explicitly converted.
 
@@ -137,21 +137,21 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     ----------
     view_list: list of int tuple
         # index starting from 1
-        modes in each view structure, e.g., [(1,2,3),(1,4)] 
+        modes in each view structure, e.g., [(1,2,3),(1,4)]
         represents view1 consists of the tensor structure of mode1, mode2, mode3
         view 2 consist of the matrix of mode1 and mode4
         the number of modes is the max value in the tuple
 
     co_rank : int
         Number of common factors in low-rank appoximation.
-        Shared by all the modes. 
+        Shared by all the modes.
 
     view_rank: int
         Number of view-discriminative factors in low-rank appoximation.
         Shared by all the modes.
 
     reg_type: str
-        'L1', 'L2', 'L21', 'maxNorm' are supported, default: 'L2'
+        'L1', 'L2' are supported, default: 'L2'
 
     reg : float, default: 0
         Strength of regularization
@@ -217,7 +217,7 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
     intercept : float, shape: [1]
         Intercept (bias) term.
 
-    weights : 
+    weights :
         list of tf.Variable, shape: [mode][view]
         List of underlying representations.
         First element in each mode will have shape [n_feature_list[mode], co_rank]
@@ -386,10 +386,6 @@ class SFMBaseModel(six.with_metaclass(ABCMeta, BaseEstimator)):
                 fd = batch_to_feeddict(bX, bY, core=self.core)
             output.append(self.session.run(self.core.outputs, feed_dict=fd))
         pred_y= np.concatenate(output).reshape(-1)
-        if self.output_range is not None:
-            assert 'min' in self.output_range and 'max' in self.output_range
-            pred_y[pred_y < self.output_range['min']] = self.output_range['min']
-            pred_y[pred_y > self.output_range['max']] = self.output_range['max']
         # TODO: check this reshape
         return pred_y
 

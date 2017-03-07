@@ -1,7 +1,5 @@
 """
-    Implementation of the core functions for the Structure-awared FMs in TensorFlow
-
-    Author: Chun-Ta Lu <clu29@uic.edu>
+    Implementation of the core functions for the Structural Factorization Machines in TensorFlow
 """
 from __future__ import (absolute_import, division,
                                 print_function, unicode_literals)
@@ -134,13 +132,6 @@ class SFMCore():
 
         self.Phi = tf.get_variable('embedding_phi', shape = [r, self.n_views], trainable=True,
                                     initializer = tf.contrib.layers.variance_scaling_initializer(factor = self.init_scaling))
-#                                    initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
-
-#        self.Phi = tf.Variable(tf.random_uniform([r, self.n_views], -self.init_std, self.init_std),
-                                #trainable = True, name = 'embedding_phi')
-
-        #Phi = tf.nn.l2_normalize(Phi, dim=0)
-#        self.Phi = tf.Variable(Phi, name= 'embedding_phi')
 
         self.b = tf.Variable(0.0, trainable=True, name='b')
         # initialize shared factors for each mode
@@ -150,12 +141,6 @@ class SFMCore():
                            shape = [self.n_feature_list[m], self.co_rank],
                            trainable=True,
                            initializer = tf.contrib.layers.variance_scaling_initializer(factor = self.init_scaling))
-#                            initializer = tf.contrib.layers.xavier_initializer())
-#                           initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
-
-#                self.W[0][m] = tf.Variable(tf.random_uniform([self.n_feature_list[m], self.co_rank], -self.init_std, self.init_std),
-                           #trainable=True,
-                           #name = 'embedding_init')
                 self.S[m] = tf.get_variable('layer_norm_S', initializer = tf.ones([r]))
 
         # initialize view specific facotrs for each mode
@@ -175,8 +160,6 @@ class SFMCore():
                                 shape = [self.n_feature_list[m-1], self.view_rank],
                                 trainable=True,
                                 initializer = tf.contrib.layers.variance_scaling_initializer(factor = init_scaling))
-#                               initializer = tf.contrib.layers.xavier_initializer())
-#                           initializer = tf.random_uniform_initializer(minval = -self.init_std, maxval = self.init_std))
                     except:
                         print('mode {} shared in view {}'.format(m,v))
 
@@ -228,18 +211,6 @@ class SFMCore():
         normalized_Z = (Z - m) / tf.sqrt(v + eps)
         return normalized_Z * s + b
 
-#    def _pow_matmul(self, order, pow):
-        #if pow not in self.x_pow_cache:
-            #x_pow = pow_wrapper(self.train_x, pow, self.input_type)
-            #self.x_pow_cache[pow] = x_pow
-        #if order not in self.matmul_cache:
-            #self.matmul_cache[order] = {}
-        #if pow not in self.matmul_cache[order]:
-            #w_pow = tf.pow(self.w[order - 1], pow)
-            #dot = matmul_wrapper(self.x_pow_cache[pow], w_pow, self.input_type)
-            #self.matmul_cache[order][pow] = dot
-        #return self.matmul_cache[order][pow]
-
     def _regularizer_func(self, W, node_name):
         if self.reg_type == 'L1':
             norm = tf.reduce_sum(tf.abs(W), name=node_name)
@@ -284,57 +255,6 @@ class SFMCore():
         self.regularization += norm
         tf.summary.scalar('regularization_penalty', self.regularization)
 
-#    def _norm_constraint_op(self):
-        #scaling = 0
-        #for v in range(len(self.view_list)):
-            #norm = tf.nn.l2_loss()
-            #norm = self._regularizer_func(self.Phi[:,v], 'regularization_penalty_phi{}'.format(v+1))
-            #tf.summary.scalar('norm_Phi_v{}'.format(v+1), norm)
-        #return tf.assign(self.Phi, scaling)
-#   def _norm_constraint_op(self):
-        #assign_op = []
-        #scaling_mode = [None] * self.n_modes
-        #eps = 1e-10
-        #for m in range(self.n_modes):
-            ## normalize every column in the weight matrix to norm_l2 = 1
-            #scaling_mode[m] = tf.sqrt(tf.reduce_sum(tf.square(self.W[0][m]), 0), name = 'scaling_v0_m{}'.format(m)) + eps
-            #norm = tf.reduce_sum(scaling_mode[m])
-            #tf.summary.scalar('norm_W_v0_m{}'.format(m), norm)
-
-            #scaled = self.W[0][m] / tf.expand_dims(scaling_mode[m], 0)
-            #assign_op.append(tf.assign(self.W[0][m], scaled))
-
-        #prod_scaling = [None] * self.n_views
-        #for i, modes in enumerate(self.view_list):
-            #v = i + 1
-            #with tf.name_scope('view_{}'.format(v)) as scope:
-                #scaling_list = [None] * self.n_modes
-                ## noting that the modes given in the input start from 1
-                #for m in modes:
-                    #with tf.name_scope('mode_{}'.format(m)) as scope:
-                        #if self.view_rank > 0:
-                            #scaling_cache = tf.sqrt(tf.reduce_sum(tf.square(self.W[v][m-1]), 0)) + eps
-                            #scaled = self.W[v][m-1] / tf.expand_dims(scaling_cache, 0)
-                            #assign_op.append(tf.assign(self.W[v][m-1], scaled))
-                            #scaling_list[m-1] = tf.concat(1, [scaling_mode[m-1], scaling_cache], name='scaling')
-                        #else:
-                            #scaling_list[m-1] = scaling_mode[m-1]
-                #scaling_tensor = tf.pack([s for s in scaling_list if s is not None],axis=1)
-                ## scaling Phi
-                #prod_scaling[i] = tf.reduce_prod(scaling_tensor, reduction_indices=[1], name='prod_scaling')
-        #phi_scaling = tf.pack([s for s in prod_scaling if s is not None], axis = 1)
-        #print(phi_scaling)
-        #scaled = tf.mul(self.Phi, phi_scaling)
-        #print(self.Phi,scaled)
-        #assign_op.append(tf.assign(self.Phi, scaled))
-##        for i, modes in enumerate(self.view_list):
-            ##v = i + 1
-            ##norm = tf.nn.l2_loss(self.Phi[:,i])
-            ##tf.summary.scalar('norm_Phi_v{}'.format(v), norm)
-        ##print(assign_op)
-        #return assign_op
-
-
     def _init_loss(self):
         self.loss = self.loss_function(self.outputs, self.train_y)
         self.reduced_loss = tf.reduce_mean(self.loss)
@@ -353,7 +273,6 @@ class SFMCore():
 
         for m in range(self.n_modes):
             self.XW_cache[m] = self._view_mode_embedding(0, m)
-#        print(self.XW_cache)
 
         for i, modes in enumerate(self.view_list):
             v = i + 1
@@ -375,16 +294,7 @@ class SFMCore():
                 # so we need to transform it to a tensor
                 embedding_tensor = tf.stack([xw for xw in XW_list if xw is not None],axis=2, name='embedding_tensor')
                 self.prod_embedding[i] = tf.reduce_prod(embedding_tensor, axis=[2], name='prod_embedding')
-#                view_prod_sum = tf.reduce_sum(self.prod_embedding[i], reduction_indices=[1], name='view_prod_sum')
-#                tf.summary.histogram('view_prod_sum{}'.format(v), view_prod_sum)
 
-#                if self.n_views > 1: 
-                    #view_contrib = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,0],(r,1)), 'dense')
-                    #self.view_contribution[i] = view_contrib + matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,v],(r,1)), 'dense')
-                    #tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
-                #else:
-                    #self.view_contribution[i] = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,i],(r,1)), 'dense')
-                #tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
                 self.view_contribution[i] = matmul_wrapper(self.prod_embedding[i], tf.reshape(self.Phi[:,i],(r,1)), 'dense')
                 tf.summary.histogram('view_contribution{}'.format(v), self.view_contribution[i])
 
@@ -409,9 +319,7 @@ class SFMCore():
     def _init_target(self):
 #        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         self.target = self.reduced_loss + self.reg * self.regularization
-#        self.target = self.reduced_loss
 
-#        self.target = tf.Print(self.target, [self.reduced_loss, self.target], message="loss, target: ")
         self.checked_target = tf.verify_tensor_all_finite(
             self.target,
             msg='NaN or Inf in target value', name='target')

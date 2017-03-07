@@ -1,4 +1,4 @@
-"""Implementation of an arbitrary order Factorization Machines."""
+"""Implementation of Structural Factorization Machines."""
 from __future__ import (absolute_import, division,
                                 print_function, unicode_literals)
 #from builtins import *
@@ -16,10 +16,9 @@ from .base import SFMBaseModel, loss_logistic, loss_mse
 
 
 class SFMClassifier(SFMBaseModel):
-    """Factorization Machine (aka FM).
+    """Strucutral Factorization Machine (aka SFM).
 
-    This class implements L2-regularized arbitrary order FM model with logistic
-    loss and gradient-based optimization.
+    This class implements SFM model with logistic loss and gradient-based optimization.
 
     Only binary classification with 0/1 labels supported.
 
@@ -95,10 +94,9 @@ class SFMClassifier(SFMBaseModel):
 
 
 class SFMRegressor(SFMBaseModel):
-    """Factorization Machine (aka FM).
+    """Structural Factorization Machine (aka SFM).
 
-    This class implements L2-regularized arbitrary order FM model with MSE
-    loss and gradient-based optimization.
+    This class implements SFM model with MSE loss and gradient-based optimization.
 
     See SFMBaseModel docs for details about parameters.
     """
@@ -130,7 +128,7 @@ class SFMRegressor(SFMBaseModel):
         return y_
 
     def predict(self, X, mode_matrices = None):
-        """Predict using the FM model
+        """Predict using the SFM model
 
         Parameters
         ----------
