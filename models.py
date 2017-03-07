@@ -1,7 +1,6 @@
 """Implementation of Structural Factorization Machines."""
 from __future__ import (absolute_import, division,
                                 print_function, unicode_literals)
-#from builtins import *
 import os
 import numpy as np
 import tensorflow as tf
